@@ -1,6 +1,10 @@
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.geometry.Insets;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -17,8 +21,8 @@ public class Main extends Application {
 
     private final double g = 500;
 
-    private static final double WIDTH = 600;
-    private static final double HEIGHT = 400;
+    private static final double WIDTH = 1000;
+    private static final double HEIGHT = 700;
 
     private boolean dragging = false;
     private double mouseEndX, mouseEndY;
@@ -28,73 +32,90 @@ public class Main extends Application {
     double offsetX, offsetY;
     long lastMouseTime;
 
+    private boolean paused = true;
+
+
 
     @Override
     public void start(Stage primaryStage) {
 
-        Pane root = new Pane();
-        root.setPrefSize(WIDTH, HEIGHT);
 
-        Circle ball = new Circle(30, Color.RED);
+        BorderPane root = new BorderPane();
+
+
+        Pane world = new Pane();
+        world.setPrefSize(WIDTH, HEIGHT);
+        root.setCenter(world);
+        Circle ball = new Circle(15, Color.RED);
         ball.setCenterX(x);
         ball.setCenterY(y);
+        Button pauseBtn = new Button("Start ");
+        HBox controls = new HBox(10);
+        controls.setPadding(new Insets(10));
+        controls.getChildren().add(pauseBtn);
+
+        root.setTop(controls);
+
+
+
 
         // Debug text
         Text debug = new Text(10, 20, "");
         debug.setStyle("-fx-font-size: 16;");
 
-        root.getChildren().addAll(ball, debug);
+        world.getChildren().addAll(ball, debug);
 
-        Scene scene = new Scene(root);
-        primaryStage.setTitle("Physics Simulator");
+        Scene scene = new Scene(root, WIDTH, HEIGHT);
+        primaryStage.setTitle("Physics Simulation");
         primaryStage.setScene(scene);
         primaryStage.show();
+        double worldHeight = world.getHeight();
+        double worldWidth  = world.getWidth();
 
-        scene.setOnMousePressed(e -> {
-            mouseX = e.getX();
+
+        pauseBtn.setOnAction(e -> {
+            paused = !paused;
+            if (paused) {
+                pauseBtn.setText("Resume");
+            } else {
+                pauseBtn.setText("Pause");
+            }
+        });
+
+        world.setOnMousePressed(e -> {
+            mouseX = e.getX(); // Get coordinates on input
             mouseY = e.getY();
 
-            double dx = e.getX() - x;
+            double dx = e.getX() - x; // Distance from center of ball to input
             double dy = e.getY() - y;
-            if( dx*dx + dy*dy <= ball.getRadius() * ball.getRadius() ) {
-                vy = 0;
+            if(dx*dx + dy*dy <= ball.getRadius() * ball.getRadius()) { // Check if distance is within radius
+
+                vy = 0; // Set velocities to zero since holding ball
                 vx = 0;
-                offsetX = dx;
+                offsetX = dx; // Get offset from center if holding ball
                 offsetY = dy;
-                mouseStartX = e.getX();
-                mouseStartY = e.getX();
-                lastMouseTime = System.nanoTime();
+
+//                mouseStartX = e.getX();
+//                mouseStartY = e.getX();
                 dragging = true;
 
             }
-
-
-
-
         });
 
-        scene.setOnMouseDragged(e -> {
-            if(dragging) {
+        world.setOnMouseDragged(e -> {
+            if(dragging) { // Change position accordingly if dragging ball, with offset from center
                 x = e.getX() - offsetX;
                 y = e.getY() - offsetY;
             }
-            mouseEndX = e.getX();
-            mouseEndY = e.getY();
+//            mouseEndX = e.getX();
+//            mouseEndY = e.getY();
 
         });
 
-        scene.setOnMouseReleased(e -> {
-            if(dragging) {
-
+        world.setOnMouseReleased(e -> {
+            if(dragging) { // If release and mouse on press was on ball, set dragging to false
                 dragging = false;
-
             }
-
-
-
-
-
-
         });
 
 
@@ -111,6 +132,10 @@ public class Main extends Application {
                 double dt = (now - lastTime) / 1_000_000_000.0;
                 lastTime = now;
 
+                if(paused) {
+                    return;
+                }
+
                 // ---- Physics ----
                 if (!dragging) {
                     vy += g * dt;
@@ -118,11 +143,9 @@ public class Main extends Application {
                     x += vx * dt;
                 }
 
-
-
                 // Floor collision
-                if (y + ball.getRadius() > HEIGHT) {
-                    y = HEIGHT - ball.getRadius();
+                if (y + ball.getRadius() > worldHeight) {
+                    y = worldHeight - ball.getRadius();
                     vy = -vy * 0.7;
                 }
 
@@ -133,8 +156,8 @@ public class Main extends Application {
                 }
 
                 // Right wall collision
-                if (x + ball.getRadius() > WIDTH) {
-                    x = WIDTH - ball.getRadius();
+                if (x + ball.getRadius() >worldWidth) {
+                    x = worldWidth - ball.getRadius();
                     vx = -vx * 0.7;
                 }
 
