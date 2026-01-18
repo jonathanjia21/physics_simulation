@@ -7,12 +7,11 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.Pane;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import org.example.Ball;
 
 
 public class Main extends Application {
@@ -41,7 +40,7 @@ public class Main extends Application {
     private double offsetX, offsetY;
     private long lastMouseTime;
     private int change = 1; // for unit conversions, 50px = 1m
-
+    private double radius = 15;
     //BUTTON BOOLEANS
     private boolean paused = true;
     private boolean simulate1 = false; //for falling simulations
@@ -49,7 +48,7 @@ public class Main extends Application {
 
     double computeTimeToGround(double heightMeters, double vyMeters) {
         double h = heightMeters;      // meters
-        double v0 = vyMeters;         // m/s
+        double v0 = -vyMeters;         // m/s
         double g = 9.8;               // m/s^2
 
         // h = v0 t + ½ g t²
@@ -69,9 +68,9 @@ public class Main extends Application {
         Pane world = new Pane();
         world.setPrefSize(WIDTH, HEIGHT);
         root.setCenter(world);
-        Circle ball = new Circle(15, Color.RED);
-        ball.setCenterX(x);
-        ball.setCenterY(y);
+        Ball ball = new Ball(x, y , radius);
+
+
 
         //BUTTONS
         Button pauseBtn = new Button("Start ");
@@ -113,7 +112,7 @@ public class Main extends Application {
         Text debug = new Text(10, 20, "");
         debug.setStyle("-fx-font-size: 16;");
 
-        world.getChildren().addAll(ball, debug);
+        world.getChildren().addAll(ball.getView(), debug);
 
         Scene scene = new Scene(root, WIDTH, HEIGHT);
         primaryStage.setTitle("Physics Simulation");
@@ -139,7 +138,7 @@ public class Main extends Application {
                 double heightMeters = Double.parseDouble(heightField.getText());
                 double vyMeters = Double.parseDouble(vyField.getText());
                 // Compute time analytically
-                double tHit = computeTimeToGround(heightMeters, -vyMeters);
+                double tHit = computeTimeToGround(heightMeters, vyMeters);
 
                 if (!Double.isNaN(tHit)) {
                     timeLabel.setText(
@@ -194,43 +193,36 @@ public class Main extends Application {
 
         //MOUSE INPUT HANDLING FOR DRAGGING BALL
             world.setOnMousePressed(e -> {
-                if(!paused) {
                     mouseX = e.getX(); // Get coordinates on input
                     mouseY = e.getY();
-                    double dx = e.getX() - x; // Distance from center of ball to input
-                    double dy = e.getY() - y;
+                    double dx = e.getX() - ball.getX(); // Distance from center of ball to input
+                    double dy = e.getY() - ball.getY();
                     if(dx*dx + dy*dy <= ball.getRadius() * ball.getRadius()) { // Check if distance is within radius
-                        vy = 0; // Set velocities to zero since holding ball
-                        vx = 0;
+                        ball.setVy(0); // Set velocities to zero since holding ball
+                        ball.setVx(0);
                         offsetX = dx; // Get offset from center if holding ball
                         offsetY = dy;
 //                mouseStartX = e.getX();
 //                mouseStartY = e.getX();
                         dragging = true;
                     }
-                }
             });
 
             world.setOnMouseDragged(e -> {
-                if(!paused) {
-                    if(dragging) { // Change position accordingly if dragging ball, with offset from center
-                        x = e.getX() - offsetX;
-                        y = e.getY() - offsetY;
-                    }
+                if(dragging) { // Change position accordingly if dragging ball, with offset from center
+                    ball.setX(e.getX() - offsetX);
+                    ball.setY(e.getY() - offsetY);
 //            mouseEndX = e.getX();
 //            mouseEndY = e.getY();
                 }
             });
 
             world.setOnMouseReleased(e -> {
-                if(!paused) {
                     if(dragging) { // If release and mouse on press was on ball, set dragging to false
                         dragging = false;
-                    }
                 }
             });
             //MOUSE INPUT HANDLING END
-
 
 
         //ANIMATION HANDLING
@@ -253,26 +245,22 @@ public class Main extends Application {
                     reset_time = false;
                 }
 
-                if(paused) {
-                    return;
-                }
-
                 if(!paused) {
                     total_time += dt;
                 }
 
                 // ---- Physics ----
-                if (!dragging) {
-                    vy += g * dt;
-                    y += vy * dt;
-                    x += vx * dt;
-
+                if(!paused) {
+                    if (!dragging) {
+                        ball.update(dt, g);
+                    }
                 }
 
                 // Floor collision
-                if (y + ball.getRadius() >= worldHeight) {
-                    y = worldHeight - ball.getRadius();
-                    vy = 0;
+                // Needed to change to not include ball radius, so calculated time and actual time matches for free-fall
+                if (ball.getY()  >= worldHeight) {
+                    ball.setY(worldHeight - ball.getRadius());
+                    ball.setVy(0);
 
                     if (simulate1) {
                         paused = true;
@@ -282,40 +270,32 @@ public class Main extends Application {
                 }
 
 
-                // Ceiling collision
-                if (y - ball.getRadius() < 0) {
-                    y = ball.getRadius();
-                    vy = -vy * 0.7;
-                }
 
-                // Right wall collision
-                if (x + ball.getRadius() >worldWidth) {
-                    x = worldWidth - ball.getRadius();
-                    vx = -vx * 0.7;
-                }
+//
+//                // Right wall collision
+//                if (x + ball.getRadius() >worldWidth) {
+//                    x = worldWidth - ball.getRadius();
+//                    vx = -vx * 0.7;
+//                }
 
                 // Left wall collision
-                if (x - ball.getRadius() < 0) {
-                    x = ball.getRadius();
-                    vx = -vx * 0.7;
+                if (ball.getX() - ball.getRadius() < 0) {
+                    ball.setX(ball.getRadius());
+                    ball.setVx(-ball.getVx()*0.7 );
                 }
-
-                // Apply position
-                ball.setCenterX(x);
-                ball.setCenterY(y);
 
                 // Update debug info
 
                 if(change == 50) {
                     debug.setText(String.format(
                             "x  = %.2fm\nvx = %.2fm/s\ny  = %.2fm\nvy = %.2fm/s\ntime elapsed = %.4fs\nmouseX = %.2fm\nmouseY = %.2fm\ngravity = %.2fm/s^2",
-                            x/change, vx/change, y/change, -vy/change, total_time, mouseX/change, mouseY/change, g/change
+                            ball.getX()/change, ball.getVx()/change, -(ball.getY()/change - 12.8), -ball.getVy()/change, total_time, mouseX/change, -(mouseY/change -12.8), g/change
                     ));
                 }
                 else {
                     debug.setText(String.format(
                     "x  = %.2fpx\nvx = %.2fpx/s\ny  = %.2fpx\nvy = %.2fpx/s\ntime elapsed = %.4fs\nmouseX = %.2fpx\nmouseY = %.2fpx\ngravity = %.2fpx/s^2",
-                            x, vx, y, -vy, total_time, mouseX, mouseY, g
+                            ball.getX(), ball.getVx(), -(ball.getY() -12.8*50), -ball.getVy(), total_time, mouseX, -(mouseY -12.8*50), g
                     ));
                 }
 
